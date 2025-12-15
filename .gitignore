@@ -1,0 +1,101 @@
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ========================
+# Virtual Environments
+# ========================
+venv/
+env/
+.venv/
+ENV/
+virtualenv/
+
+# ========================
+# Jupyter Notebook
+# ========================
+.ipynb_checkpoints/
+*.nbconvert.ipynb
+
+# ========================
+# Data & Models
+# ========================
+data/
+datasets/
+*.csv
+*.tsv
+*.xlsx
+*.json
+*.parquet
+*.h5
+*.pkl
+*.joblib
+models/
+checkpoints/
+
+# ========================
+# Logs & Outputs
+# ========================
+logs/
+*.log
+outputs/
+results/
+reports/
+
+# ========================
+# ML / DL Frameworks
+# ========================
+wandb/
+mlruns/
+tensorboard/
+lightning_logs/
+
+# ========================
+# Environment & Secrets
+# ========================
+.env
+.env.*
+secrets.yaml
+secrets.json
+config.yaml
+config.json
+
+# ========================
+# OS / Editor Files
+# ========================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ========================
+# Streamlit / FastAPI
+# ========================
+.streamlit/
+*.db
+*.sqlite3
+
+# ========================
+# Finance / Trading
+# ========================
+backtests/
+trade_logs/
+paper_trades/
+
+# ========================
+# Temporary Files
+# ========================
+tmp/
+temp/
+.cache/
