@@ -127,21 +127,57 @@ with st.sidebar:
 def display_transaction_form(transaction=None):
     """Display transaction form for add/edit"""
     is_edit = transaction is not None
-    
+
+    # -----------------------------
+    # CATEGORY DEFINITIONS (ALWAYS DEFINED)
+    # -----------------------------
+    expense_categories = [
+        "Groceries", "Dining & Restaurants", "Transportation",
+        "Utilities", "Rent/Mortgage", "Entertainment", "Shopping",
+        "Healthcare", "Education", "Travel", "Insurance", "Other Expense"
+    ]
+
+    income_categories = [
+        "Salary", "Freelance", "Investment Income", "Other Income"
+    ]
+
+    CATEGORY_MAP = {
+        "Groceries": Category.GROCERIES,
+        "Dining & Restaurants": Category.DINING,
+        "Transportation": Category.TRANSPORT,
+        "Utilities": Category.UTILITIES,
+        "Rent/Mortgage": Category.RENT,
+        "Entertainment": Category.ENTERTAINMENT,
+        "Shopping": Category.SHOPPING,
+        "Healthcare": Category.HEALTHCARE,
+        "Education": Category.EDUCATION,
+        "Travel": Category.TRAVEL,
+        "Insurance": Category.INSURANCE,
+        "Other Expense": Category.OTHER_EXPENSE,
+        "Salary": Category.SALARY,
+        "Freelance": Category.FREELANCE,
+        "Investment Income": Category.INVESTMENT,
+        "Other Income": Category.OTHER_INCOME,
+    }
+
+    # -----------------------------
+    # FORM
+    # -----------------------------
     with st.form("transaction_form", clear_on_submit=not is_edit):
         col1, col2 = st.columns(2)
-        
+
         with col1:
             date = st.date_input(
                 "Date",
-                value=transaction.date if is_edit else datetime.now()
+                value=transaction.date.date() if is_edit else datetime.now().date()
             )
+
             merchant = st.text_input(
-                "Merchant/Description",
+                "Merchant / Description",
                 value=transaction.merchant if is_edit else "",
-                placeholder="e.g., Starbucks, Salary, etc."
+                placeholder="e.g. Starbucks, Salary"
             )
-        
+
         with col2:
             amount = st.number_input(
                 "Amount ($)",
@@ -149,68 +185,80 @@ def display_transaction_form(transaction=None):
                 value=abs(transaction.amount) if is_edit else 0.01,
                 step=0.01,
                 format="%.2f"
-            )           
+            )
 
             trans_type = st.selectbox(
                 "Type",
                 ["Expense", "Income"],
-                index=0 if not is_edit else (1 if transaction.transaction_type == TransactionType.INCOME else 0)
+                index=(
+                    1 if is_edit and transaction.transaction_type == TransactionType.INCOME
+                    else 0
+                )
             )
-        
-        # Category selection
-        if trans_type == "Expense":
-            categories = [
-                "Groceries", "Dining & Restaurants", "Transportation",
-                "Utilities", "Rent/Mortgage", "Entertainment", "Shopping",
-                "Healthcare", "Education", "Travel", "Insurance", "Other Expense"
-            ]
-        else:
-            categories = ["Salary", "Freelance", "Investment Income", "Other Income"]
-        
+
+        # -----------------------------
+        # CATEGORY SELECTION
+        # -----------------------------
+        categories = expense_categories if trans_type == "Expense" else income_categories
+
         category = st.selectbox(
             "Category",
             categories,
-            index=categories.index(transaction.category.value) if is_edit and transaction.category.value in categories else 0
+            index=(
+                categories.index(transaction.category.value)
+                if is_edit and transaction.category.value in categories
+                else 0
+            )
         )
-        
+
         notes = st.text_area(
             "Notes (Optional)",
             value=transaction.notes if is_edit else "",
-            placeholder="Add any additional details..."
+            placeholder="Any additional details..."
         )
-        
-        col1, col2, col3 = st.columns(3)
-        
+
+        col1, col2 = st.columns(2)
+
         with col1:
             submitted = st.form_submit_button(
                 "💾 Update Transaction" if is_edit else "💾 Save Transaction",
                 use_container_width=True
             )
-        
+
         with col2:
-            if not is_edit:
-                predict = st.form_submit_button(
-                    "🤖 Auto-Predict",
-                    use_container_width=True
-                )
-            else:
-                predict = False
-        
+            predict = (
+                st.form_submit_button("🤖 Auto-Predict", use_container_width=True)
+                if not is_edit
+                else False
+            )
+
+        # -----------------------------
+        # SAVE LOGIC
+        # -----------------------------
         if submitted:
             try:
+                if not merchant.strip():
+                    st.error("❌ Merchant name cannot be empty")
+                    return
+
                 final_amount = amount if trans_type == "Income" else -amount
-                category_enum = Category(category)
-                
+                category_enum = CATEGORY_MAP[category]
+
                 if is_edit:
                     transaction.date = datetime.combine(date, datetime.min.time())
                     transaction.amount = final_amount
                     transaction.merchant = merchant
                     transaction.category = category_enum
-                    transaction.transaction_type = TransactionType.INCOME if trans_type == "Income" else TransactionType.EXPENSE
+                    transaction.transaction_type = (
+                        TransactionType.INCOME
+                        if trans_type == "Income"
+                        else TransactionType.EXPENSE
+                    )
                     transaction.notes = notes
-                    
+
                     service.update_transaction(transaction)
                     st.success("✅ Transaction updated successfully!")
+
                 else:
                     service.add_transaction(
                         date=datetime.combine(date, datetime.min.time()),
@@ -220,21 +268,26 @@ def display_transaction_form(transaction=None):
                         notes=notes
                     )
                     st.success("✅ Transaction added successfully!")
-                
+
                 st.rerun()
-                
+
             except Exception as e:
                 st.error(f"❌ Error: {str(e)}")
-        
+
+        # -----------------------------
+        # ML PREDICTION (OPTIONAL)
+        # -----------------------------
         if predict:
             prediction = service.predict_category(merchant, amount)
-            st.info(f"""
-            🤖 **AI Prediction**
-            
-            Based on "{merchant}", I predict:
-            - **Category**: {prediction['category']}
-            - **Confidence**: {prediction['confidence']:.0%}
-            """)
+            st.info(
+                f"""
+                🤖 **AI Prediction**
+
+                **Category:** {prediction['category']}  
+                **Confidence:** {prediction['confidence']:.0%}
+                """
+            )
+
 
 # ============================================================================
 # PAGE 1
@@ -1048,6 +1101,9 @@ elif page == "⚙️ Settings":
     
     tab1, tab2, tab3 = st.tabs(["🗄️ Database", "📤 Export/Import", "ℹ️ About"])
     
+    # =========================
+    # DATABASE TAB
+    # =========================
     with tab1:
         st.subheader("Database Management")
         
@@ -1065,7 +1121,42 @@ elif page == "⚙️ Settings":
             st.metric("Database Size", f"{stats['db_size_mb']:.2f} MB")
             
             st.markdown("---")
-            
+
+            # =========================
+            # DEMO DATA (LEVEL 2 ENABLER)
+            # =========================
+            st.subheader("🧪 Demo Data & ML Training")
+
+            st.info(
+                "If you are new or have very few transactions, "
+                "generate demo data to enable ML-powered insights "
+                "(auto-categorization, anomaly detection, predictions)."
+            )
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if st.button("🧪 Generate Demo Data (100 transactions)", use_container_width=True):
+                    try:
+                        service.generate_demo_data(100)
+                        st.success("✅ 100 demo transactions generated!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to generate demo data: {e}")
+
+            with col2:
+                if st.button("🧠 Retrain ML Engine", use_container_width=True):
+                    try:
+                        service.ml_engine.train_from_history()
+                        st.success("✅ ML model retrained successfully!")
+                    except Exception as e:
+                        st.error(f"ML training failed: {e}")
+
+            st.markdown("---")
+
+            # =========================
+            # MAINTENANCE
+            # =========================
             col1, col2 = st.columns(2)
             
             with col1:
@@ -1086,14 +1177,16 @@ elif page == "⚙️ Settings":
             
             st.markdown("---")
             st.warning("⚠️ Danger Zone")
-            
+
             if st.checkbox("Enable dangerous operations"):
-                if st.button("🗑️ Clear All Data", type="secondary"):
-                    st.error("This operation is not available in this version for safety")
-        
+                st.error("❌ Clear All Data is intentionally disabled to protect ML integrity.")
+
         except Exception as e:
             st.error(f"Error loading database stats: {str(e)}")
     
+    # =========================
+    # EXPORT / IMPORT TAB
+    # =========================
     with tab2:
         st.subheader("Export Data")
         
@@ -1135,6 +1228,9 @@ elif page == "⚙️ Settings":
             mime="text/csv"
         )
     
+    # =========================
+    # ABOUT TAB
+    # =========================
     with tab3:
         st.subheader("About Personal Finance Advisor")
         
@@ -1157,19 +1253,9 @@ elif page == "⚙️ Settings":
         - **Analytics:** Pandas, Plotly
         - **ML:** Custom ML engine
         
-        ### 📚 Resources
-        - [Documentation](#)
-        - [GitHub Repository](#)
-        - [Report Issues](#)
-        
-        ### 📧 Support
-        For support, contact: support@financeadvisor.com
-        
         ---
-        
         Made with ❤️ for better financial management
         """)
-
 
 
 st.markdown("---")

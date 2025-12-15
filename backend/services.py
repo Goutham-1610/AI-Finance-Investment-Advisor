@@ -12,6 +12,9 @@ from .analytics import AnalyticsEngine
 from .ml_engine import MLEngine
 from .models import Transaction, Budget, FinancialGoal, Category, TransactionType
 from .config import DATABASE_PATH
+from backend.ml.categorizer import TransactionCategorizer
+from backend.ml.rules import rule_based_category
+
 
 
 class FinanceService:
@@ -24,6 +27,9 @@ class FinanceService:
         self.goal_repo = GoalRepository(self.db)
         self.analytics = AnalyticsEngine(self.transaction_repo)
         self.ml_engine = MLEngine(self.transaction_repo)
+        self.categorizer = TransactionCategorizer()
+        self.categorizer.load()
+    
         
         # Train ML engine on startup
         self._initialize_ml_engine()
@@ -168,12 +174,36 @@ class FinanceService:
     # ========================================================================
     
     def predict_category(self, merchant: str, amount: float) -> dict:
-        """Predict category for a transaction"""
-        category, confidence = self.ml_engine.predict_category(merchant, amount)
+        """
+        Predict category using:
+        1. Rule-based fallback (cold start)
+        2. ML engine (once data exists)
+        """
+
+        # 1️⃣ Rule-based fallback
+        rule_cat = rule_based_category(merchant)
+        if rule_cat:
+            return {
+                'category': rule_cat,
+                'confidence': 0.95
+            }
+
+        # 2️⃣ ML-based prediction
+        try:
+            category, confidence = self.ml_engine.predict_category(merchant, amount)
+            return {
+                'category': category.value,
+                'confidence': confidence
+            }
+        except Exception:
+            pass
+
+        # 3️⃣ Final fallback
         return {
-            'category': category.value,
-            'confidence': confidence
+            'category': Category.OTHER_EXPENSE.value,
+            'confidence': 0.0
         }
+
     
     def predict_spending(
         self, 
@@ -280,6 +310,36 @@ class FinanceService:
     # Import/Export
     # ========================================================================
     
+
+    def generate_demo_data(self, n: int = 100):
+        """Generate synthetic demo transactions for ML bootstrapping"""
+        import random
+
+        demo_data = [
+            ("Starbucks", Category.DINING, -250),
+            ("Uber", Category.TRANSPORT, -320),
+            ("Amazon", Category.SHOPPING, -1500),
+            ("Netflix", Category.ENTERTAINMENT, -499),
+            ("Rent", Category.RENT, -15000),
+            ("Salary", Category.SALARY, 60000),
+            ("Zomato", Category.DINING, -450),
+            ("Swiggy", Category.DINING, -380),
+            ("Electricity Bill", Category.UTILITIES, -2200),
+            ("Gym", Category.HEALTHCARE, -1200),
+        ]
+
+        for _ in range(n):
+            merchant, category, amount = random.choice(demo_data)
+            days_ago = random.randint(1, 180)
+
+            self.add_transaction(
+                date=datetime.now() - timedelta(days=days_ago),
+                amount=amount,
+                merchant=merchant,
+                category=category,
+                notes="Demo data"
+            )
+
     def import_from_csv(self, csv_content: str) -> dict:
         """Import transactions from CSV content"""
         imported = 0

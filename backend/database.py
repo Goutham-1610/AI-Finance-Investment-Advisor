@@ -9,6 +9,10 @@ import shutil
 from datetime import datetime
 
 from .config import DATABASE_PATH, DATABASE_BACKUP_DIR
+from sqlalchemy import create_engine
+
+engine = create_engine("sqlite:///finance.db")
+
 
 
 class Database:
