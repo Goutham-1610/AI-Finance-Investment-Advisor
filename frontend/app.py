@@ -178,16 +178,16 @@ def display_transaction_form(transaction=None):
                 placeholder="e.g. Starbucks, Salary"
             )
             # Live category prediction (only for new transactions)
-            if merchant and amount > 0 and not is_edit:
-                try:
-                    prediction = service.predict_category(merchant, amount)
+            # if merchant and amount > 0 and not is_edit:
+            #     try:
+            #         prediction = service.predict_category(merchant, amount)
 
-                    st.info(
-                        f"🤖 **AI Prediction:** {prediction['category']} "
-                        f"({prediction['confidence']*100:.0f}% confidence)"
-                    )
-                except Exception:
-                    pass
+            #         st.info(
+            #             f"🤖 **AI Prediction:** {prediction['category']} "
+            #             f"({prediction['confidence']*100:.0f}% confidence)"
+            #         )
+            #     except Exception:
+            #         pass
 
 
         with col2:
@@ -207,21 +207,41 @@ def display_transaction_form(transaction=None):
                     else 0
                 )
             )
+            predicted_category = None
+
+            if merchant and amount > 0 and not is_edit:
+                try:
+                    prediction = service.predict_category(merchant, amount)
+                    predicted_category = prediction["category"]
+
+                    st.info(
+                        f"🤖 **AI Prediction:** {prediction['category']} "
+                        f"({prediction['confidence']*100:.0f}% confidence)"
+                    )
+                except Exception:
+                    st.caption("🤖 ML model warming up…")
+
+
+            
 
         # -----------------------------
         # CATEGORY SELECTION
         # -----------------------------
         categories = expense_categories if trans_type == "Expense" else income_categories
 
+        default_index = 0
+
+        if is_edit and transaction.category.value in categories:
+            default_index = categories.index(transaction.category.value)
+        elif predicted_category in categories:
+            default_index = categories.index(predicted_category)
+
         category = st.selectbox(
             "Category",
             categories,
-            index=(
-                categories.index(transaction.category.value)
-                if is_edit and transaction.category.value in categories
-                else 0
-            )
+            index=default_index
         )
+
 
         notes = st.text_area(
             "Notes (Optional)",
