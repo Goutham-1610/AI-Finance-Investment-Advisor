@@ -7,10 +7,50 @@ from typing import List, Dict, Optional
 
 from .repositories import TransactionRepository
 from .models import Transaction, TransactionType, Category
+import numpy as np
+from collections import defaultdict
 
 
 class AnalyticsEngine:
     """Analytics and reporting engine"""
+
+    def find_anomalies(self, z_threshold: float = 2.5):
+        """
+        Detect anomalous transactions based on amount deviation
+        """
+        transactions = self.transaction_repo.get_all()
+        if len(transactions) < 10:
+            return []
+
+        category_amounts = defaultdict(list)
+
+        # Group by category
+        for t in transactions:
+            if t.amount < 0:  # only expenses
+                category_amounts[t.category.value].append(abs(t.amount))
+
+        anomalies = []
+
+        for t in transactions:
+            if t.amount >= 0:
+                continue
+
+            amounts = category_amounts[t.category.value]
+            if len(amounts) < 5:
+                continue
+
+            mean = np.mean(amounts)
+            std = np.std(amounts)
+
+            if std == 0:
+                continue
+
+            z_score = (abs(t.amount) - mean) / std
+
+            if z_score > z_threshold:
+                anomalies.append(t)
+
+        return anomalies
     
     def __init__(self, transaction_repo: TransactionRepository):
         self.transaction_repo = transaction_repo

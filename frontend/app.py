@@ -177,6 +177,18 @@ def display_transaction_form(transaction=None):
                 value=transaction.merchant if is_edit else "",
                 placeholder="e.g. Starbucks, Salary"
             )
+            # Live category prediction (only for new transactions)
+            if merchant and amount > 0 and not is_edit:
+                try:
+                    prediction = service.predict_category(merchant, amount)
+
+                    st.info(
+                        f"🤖 **AI Prediction:** {prediction['category']} "
+                        f"({prediction['confidence']*100:.0f}% confidence)"
+                    )
+                except Exception:
+                    pass
+
 
         with col2:
             amount = st.number_input(
@@ -811,63 +823,37 @@ elif page == "📈 Analytics":
     
     with tab3:
         st.subheader("⚠️ Anomaly Detection")
-        
+
         try:
             dashboard = service.get_dashboard_data(days=30)
-            anomalies = [service.get_transaction_by_id(a['id']) for a in dashboard['anomalies'] if a.get('id')]
-            anomalies = [a for a in anomalies if a]
-            
+            anomalies = dashboard.get("anomalies", [])
+
             if anomalies:
-                st.warning(f"Found {len(anomalies)} unusual transactions")
-                
+                st.error(f"🚨 {len(anomalies)} unusual transactions detected")
+
                 anomaly_df = pd.DataFrame([
                     {
-                        'Date': a.date.strftime('%Y-%m-%d'),
-                        'Merchant': a.merchant,
-                        'Amount': format_currency(abs(a.amount)),
-                        'Category': a.category.value,
-                        'Notes': a.notes
+                        "Date": a["date"][:10],
+                        "Merchant": a["merchant"],
+                        "Amount": format_currency(abs(a["amount"])),
+                        "Category": a["category"]
                     }
                     for a in anomalies
                 ])
-                
-                st.dataframe(anomaly_df, use_container_width=True, hide_index=True)
-                st.caption("💡 These transactions deviate significantly from your normal spending patterns")
+
+                st.dataframe(anomaly_df, use_container_width=True)
+
+                st.caption(
+                    "💡 These transactions significantly deviate from your usual spending patterns "
+                    "based on historical behavior."
+                )
+
             else:
-                st.success("No anomalies detected! All spending appears normal.")
-        
+                st.success("✅ No anomalies detected. Your spending looks normal!")
+
         except Exception as e:
             st.error(f"Error detecting anomalies: {str(e)}")
-    
-    with tab4:
-        st.subheader("🔄 Recurring Transactions")
-        
-        try:
-            recurring = service.get_recurring_transactions()
-            
-            if recurring:
-                st.info(f"Found {len(recurring)} potential recurring transactions")
-                
-                recurring_df = pd.DataFrame([
-                    {
-                        'Merchant': r['merchant'],
-                        'Amount': format_currency(r['amount']),
-                        'Frequency': f"Every {r['frequency_days']} days",
-                        'Last Date': r['last_date'][:10],
-                        'Next Expected': r['next_expected'][:10],
-                        'Confidence': format_percentage(r['confidence'] * 100)
-                    }
-                    for r in recurring
-                ])
-                
-                st.dataframe(recurring_df, use_container_width=True, hide_index=True)
-                
-                st.caption("💡 Set up automatic budget allocations for these recurring expenses")
-            else:
-                st.info("No recurring patterns detected yet. Add more transactions to identify patterns.")
-        
-        except Exception as e:
-            st.error(f"Error detecting recurring transactions: {str(e)}")
+
 
 # ============================================================================
 # PAGE 5
