@@ -70,6 +70,17 @@ class MLEngine:
             ]
         }
     
+    def add_training_example(self, merchant, amount, category):
+        self.training_data.append({
+            "merchant": merchant.lower(),
+            "amount": amount,
+            "category": category
+        })
+    
+        # Optional: auto-retrain every N samples
+        if len(self.training_data) % 10 == 0:
+            self.train()
+
     def predict_category(
         self, 
         merchant: str, 
