@@ -491,7 +491,7 @@ if page == "📊 Dashboard":
             # Trend insight
             trend = trends['trend']
             trend_icon = "📈" if trend == "increasing" else "📉" if trend == "decreasing" else "➡️"
-            trend_color = "🔴" if trend == "increasing" else "🟢" if trend == "decreasing" else "🟡"
+            trend_color = "🔴" if trend == "increasing" else "🟢                " if trend == "decreasing" else "🟡"
             
             st.info(f"""
             **{trend_icon} Spending Trend: {trend.title()}** {trend_color}
